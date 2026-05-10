@@ -85,7 +85,7 @@ COPY --chown=hermes:hermes . .
 # Build browser dashboard and terminal UI assets.
 RUN cd web && npm run build && \
     cd ../ui-tui && npm run build
-
+    
 # ---------- Permissions ----------
 # Make install dir world-readable so any HERMES_UID can read it at runtime.
 # The venv needs to be traversable too.
