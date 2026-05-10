@@ -2,8 +2,16 @@
 # Docker/Podman entrypoint: bootstrap config files into the mounted volume, then run hermes.
 set -e
 
-HERMES_HOME="${HERMES_HOME:-/opt/data}"
 INSTALL_DIR="/opt/hermes"
+
+# Activate the Python venv early so it is present in PATH for the entire
+# script — including when the script re-execs itself via gosu.  This means
+# any start command (e.g. `gateway run`) works without needing the full
+# entrypoint path.
+# shellcheck source=/dev/null
+source "${INSTALL_DIR}/.venv/bin/activate"
+
+HERMES_HOME="${HERMES_HOME:-/opt/data}"
 
 # --- Privilege dropping via gosu ---
 # When started as root (the default for Docker, or fakeroot in rootless Podman),
@@ -55,7 +63,6 @@ if [ "$(id -u)" = "0" ]; then
 fi
 
 # --- Running as hermes from here ---
-source "${INSTALL_DIR}/.venv/bin/activate"
 
 # Create essential directory structure.  Cache and platform directories
 # (cache/images, cache/audio, platforms/whatsapp, etc.) are created on
