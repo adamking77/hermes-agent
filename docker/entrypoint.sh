@@ -4,13 +4,6 @@ set -e
 
 INSTALL_DIR="/opt/hermes"
 
-# Activate the Python venv early so it is present in PATH for the entire
-# script — including when the script re-execs itself via gosu.  This means
-# any start command (e.g. `gateway run`) works without needing the full
-# entrypoint path.
-# shellcheck source=/dev/null
-source "${INSTALL_DIR}/.venv/bin/activate"
-
 HERMES_HOME="${HERMES_HOME:-/opt/data}"
 
 # --- Privilege dropping via gosu ---
@@ -59,7 +52,7 @@ if [ "$(id -u)" = "0" ]; then
     fi
 
     echo "Dropping root privileges"
-    exec gosu hermes "$0" "$@"
+    exec gosu hermes bash -c "source ${INSTALL_DIR}/.venv/bin/activate && exec \"$0\" \"$@\""
 fi
 
 # --- Running as hermes from here ---
