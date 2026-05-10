@@ -147,6 +147,9 @@ esac
 # `sleep infinity` sandbox containers — see tools/environments/docker.py).
 # Otherwise we treat the args as a hermes subcommand and wrap with `hermes`,
 # preserving the documented `docker run <image> <subcommand>` behavior.
+if [ $# -gt 0 ] && [ "$1" = "gateway" ]; then
+    exec "$@"
+fi
 if [ $# -gt 0 ] && command -v "$1" >/dev/null 2>&1; then
     exec "$@"
 fi
