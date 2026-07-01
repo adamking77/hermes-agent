@@ -69,6 +69,16 @@ _LOOPBACK_HOSTS = frozenset({
     "ip6-loopback",
 })
 
+_CORS_ALLOWED_ORIGIN_RE = re.compile(
+    r"^https?://(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$"
+)
+
+_CORS_ALLOWED_HEADERS = (
+    "Content-Type, X-GitHub-Event, X-GitHub-Delivery, "
+    "X-Hub-Signature-256, X-GitLab-Event, X-Gitlab-Token, "
+    "X-Webhook-Signature, X-Request-ID, svix-id, svix-signature, svix-timestamp"
+)
+
 
 def _is_loopback_host(host: str) -> bool:
     """True when `host` binds only to the local machine.
@@ -173,8 +183,9 @@ class WebhookAdapter(BasePlatformAdapter):
                         f"real target (telegram, discord, slack, github_comment, etc.)."
                     )
 
-        app = web.Application()
+        app = web.Application(middlewares=[self._cors_middleware])
         app.router.add_get("/health", self._handle_health)
+        app.router.add_options("/webhooks/{route_name}", self._handle_options)
         app.router.add_post("/webhooks/{route_name}", self._handle_webhook)
 
         # Port conflict detection — fail fast if port is already in use
@@ -284,6 +295,31 @@ class WebhookAdapter(BasePlatformAdapter):
     # ------------------------------------------------------------------
     # HTTP handlers
     # ------------------------------------------------------------------
+
+    def _apply_cors_headers(
+        self, request: "web.Request", response: "web.StreamResponse"
+    ) -> "web.StreamResponse":
+        origin = request.headers.get("Origin", "")
+        if _CORS_ALLOWED_ORIGIN_RE.match(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = _CORS_ALLOWED_HEADERS
+            response.headers["Access-Control-Max-Age"] = "600"
+            response.headers["Vary"] = "Origin"
+        return response
+
+    async def _cors_middleware(self, app, handler):
+        async def middleware_handler(
+            request: "web.Request",
+        ) -> "web.StreamResponse":
+            response = await handler(request)
+            return self._apply_cors_headers(request, response)
+
+        return middleware_handler
+
+    async def _handle_options(self, request: "web.Request") -> "web.Response":
+        """OPTIONS /webhooks/{route_name} — local browser preflight."""
+        return self._apply_cors_headers(request, web.Response(status=204))
 
     async def _handle_health(self, request: "web.Request") -> "web.Response":
         """GET /health — simple health check."""
